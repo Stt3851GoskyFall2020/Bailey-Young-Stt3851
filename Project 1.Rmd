@@ -1,0 +1,388 @@
+---
+title: "Project 1"
+author: "Bailey Young, Sage Young, Matt Ramundo"
+date: '`r format(Sys.time(), "%A, %B %d, %Y @ %I:%M %p")`'
+output: 
+  html_document: 
+    theme: yeti
+    highlight: textmate
+---
+
+## {.tabset}
+
+```{r globalopts, include = FALSE}
+library(ISLR)
+library(ggplot2)
+library(readxl)
+library(dplyr)
+library(car)
+```
+
+###**Data Summary**
+
+####**Data Summary**
+***
+```{r}
+Housing <- read_excel("Housing.xlsx")
+#First we check to see if there are any missing values in the data set. Then, we check to see if there are any outliers and investigate them.
+!is.na(Housing)
+#There are no missing values in this dataset. 
+```
+
+```{r}
+attach(Housing)
+# 2x2 of boxplots for each variable to see if there are any unusual values
+par(mfrow=c(2,2))
+boxplot(price, ylab = "Price ($1000)")
+boxplot(size, ylab = "Size (1000 sqft.)")
+boxplot(lot, ylab = "Lot Size")
+boxplot(bath, ylab = "Number of Bathrooms")
+
+#here we use which.min/which.max and min/max functions to find the specific points shown on the boxplot
+which.min(size)
+min(size)
+which.max(size)
+max(size)
+which.max(lot)
+max(lot)
+```
+
+***
+#####**Missing values:** We see that there are no missing values in the dataset and move on to evaluate the outliers that are shown in the boxplots of each variable. 
+#####**Outliers:**
+  + **Price:** Looking at the price boxplot, we see no outliers.
+  + **Size:** On the size boxplot, we see two outliers: one home with a price much greater, and one home with a price that is much less. Neither of the values for these outliers is unthinkably large or small for the size of a home. They may just be unlikely in this area. Taking a closer look we see that the smaller outlier is #20, with a square footage of 1440. We see that this is an older home, built in 1948, 3 bed, 2 bath, 2 car garage, on the market for 277,000 dollars. We conclude that the house is small, but upon reviewing the values for the other variables, there is nothing too concerning. We decide to leave this point in the dataset. The larger outlier, #76 is 2896 sqft, 5 bed, 3 bath, 2 car garage, built in 1979, and selling for 349,500 dollars. We concluded that 2896 sqft. for a 5 bed, 3 bath, and 2 car garage makes sense. It is the largest home in the area, but the other values don't suggest anyting alarming. We think that the price looks a little low, but that may be because of the age of the house or it could be in an undesirable location. 
+  + **Lot:** On the lot boxplot, we have one outlier that is greater than the rest. It is #74 and scored an 11 on the lot size ranking scale. Since we don't have any actual measurements to reference, it is hard to make a solid conclusion as to whether this point is accurate or not. The price of this home is 435,000 dollars, which is one of the most expensive in the set. The house is also fairly big, at 2253 sqft. After looking at the values for #76, the largest home at 2,896 sqft., priced at 349,500, and built in the same year, 1979 we conclude that the values for #74 make sense. The home is smaller, but more expensive, which coincides with the idea that it has a massive lot. Again, we cannot be positve as to whether or not this point has some astronomical value for the lot variable without exact measurements, but all things considered, we think it is fairly in line with the other points, and decide to leave it under the assumption that it is probably a farmhouse or something similar. 
+  + **Bathrooms:** There are no outliers present in the bathrooms boxplot.
+
+***
+```{r}
+par(mfrow=c(2,2))
+boxplot(bedrooms, ylab = "Number of Bedrooms")
+boxplot(yearbuilt, ylab = "Year Built")
+boxplot(agestandardized, ylab = "Age Standardized (yearbuilt – 1970)/10)")
+boxplot(garagesize, ylab = "Garage Size (No. of Cars)")
+which.max(bedrooms)
+max(bedrooms)
+```
+
+***
+  + **Bedrooms:** We have one outlier on the bedrooms boxplot, #35 with 6 bedrooms. Right away, we decide that 6 bedrooms is not unheard of, but decide to check the square footage and price just in case. #35 is a 6 bedroom, 2 bath, 1888 sqft home, priced at 252,500. We think this combination is weird, but the home was built in 1920 so it may just have a weird design with tiny rooms. We came up with the justification that immediate families tended to be much bigger around the time this home was built, and having many tiny rooms may have been more practical. In order to see if this theory has any merit, we look at other homes built around this time. There is only a few and they don't have similar proportions. Mostly 3 or 4 bedrooms and around 2000 square feet. We hesitantly made the decision to remove point #35. We decided that while the proportions were possible, they were weird, and not present in any other case in the data, so in order to build the best model, we excluded #35. 
+  + **Year Built:** On the year built boxplot, there were a few outliers that were really old homes. From looking at the boxplot, it seems anything older than around 1930 is considered an outlier. After reviewing these older points: #64 built in 1904, #54 built in 1905, #52 built in 1919, #35 built in 1920, and #15 built in 1925, we decided to leave them all in. They are much older, but nothing too unusual. Homes from the early 1900s still exist, and therefore need to be represented, and we didn't really have any basis to throw them out.
+  + **Age Standardized:** For age standardized, we came to the same conclusion. 
+  + **Garage Size:** There were no outliers on the garage size boxplot.
+
+***
+```{r}
+parker_district <- filter(Housing, elem == "parker")
+which.max(parker_district$price)
+#filtering the dataset in order to locate the max price in that district
+edge_district <- filter(Housing, elem == "edge")
+which.max(edge_district$price)
+#finding the id for outliers in the school district boxplot
+```
+
+***
+  + **Elementary School District:** There were two outliers when looking at the elementary school districts. One abnormally expesive house in Edge district, and one in Parker. In the Parker Elementary District dataset, we had #10. It is a 2,129 sqft., 3 bed, 2 bath, lot size = 5, built in 2003, and pending sale for 355,000 dollars. All of these numbers fall in line with other homes in the main dataset, but it is quite expensive for something in the Parker Elementary District. It is one of only three homes in the district built after 2000, which we think is the reasoning behind the price. We decide this point is not all that unusual. Point #26 in the Edge Elementary District dataset is the outlier for price within that district. We recognize this as #74 from the main dataset. The reason for the expensive price is the huge lot. It does seem slightly out of place for the Edge District, but we decide that the numbers make sense and it should be kept in. 
+
+***
+```{r}
+#for the categorical variables we made a boxplot showing price vs. the different categories 
+ggplot(Housing, aes(x=elem, y=price, color=elem)) + 
+  geom_boxplot() +
+  labs(y = "Price (in Thousands of Dollars)", x = "Elementary School District", title = "Price of Home vs. Location by Elementary School District")
+ggplot(Housing, aes(x=status, y=price, color=status)) + 
+  geom_boxplot() +
+  labs(y = "Price (in Thousands of Dollars)", x = "Status of Sale (Active Listing, Pending Sale, Sold", title = "Price of Home vs. Status of Sale" )
+```
+
+***
+  + **Status:** There are two price outliers for the status boxplot, both are categorized as "sold". They are #2 and #74. #74 we are very familiar with at this point, but looking at #2 it does seem unusually expensive. #2 is a 4 bed, 3 bath, 2054 sqft., lot size = 5, built in 1957 and selling for 450,000 dollars. We remember there were no outliers in the price boxplot, so the price itself is not abnormal within the dataset. 450,000 dollars is an abnormal price compared to other homes with a sold status. We did not think that status would have very much of an impact on price. The only thing we can think of is that the price that a home sells for may be less than what it was listed for because people tend to negotiate on house prices and the sellers price will go down. Therefore active listing prices may tend to be higher than sold prices. #2 shows the opposite. The status is sold but it is the highest price in the dataset overall. The house is kind of big, but it is older. Since the price is not anything unthinkable, we decide to leave this point in. It is an expensive home, but there is probably some justification. It may have a pool or very expensive renovations. 
+  
+  + **Conclusion:** After reviewing the outliers for each variable, there is only one point we decided to remove, #35. Since we reviewed outliers based on there proximity to other values within the variable, and then looked at the values for other variables for that home to justify including or excluding them, it is possible that we may have overlooked something or perhaps justified something that is more outrageous than it appears from looking at the homes on a case by case basis. This is just a starting point for our model. When we use multiple variables to predict price, we may find more abnormalities or outlies in our data. Therefore, the conclusions made in this section are subject to change. 
+
+***
+```{r}
+#removing point #35
+Housing1.0 <- Housing[-c(35),]
+Housing1.0
+```
+
+***
+*Here we remove #35 from the previous dataset (Housing). The dataset we are working with in the next section is Housing1.0, with 75 observations. The points mentioned in this section (data = Housing) by ID will not necessarily line up with the IDs in follwing sections (data = Housing1.0)*
+
+###**Exploratory Data Analysis**
+
+####**Exploratory Data Analysis**
+
+***
+```{r}
+#First, we were interested to see whether these categorical variables had any significant impact on price
+lm_status <- lm(price ~ status, data = Housing1.0)
+summary(lm_status)
+ggplot(Housing, aes(x=status, y=price, color=status)) + 
+  geom_boxplot() +
+  labs(y = "Price (in Thousands of Dollars)", x = "Status of Sale (Active Listing, Pending Sale, Sold", title = "Price of Home vs. Status of Sale" )
+```
+
+***
+After modeling price as a function of status, status as a whole seems to be very close to being significant. The p-value is 0.06285 and R-squared is 0.07398. We were correct in our prediction that sold houses would be less expensive than those currently on the market. We were surprised to see that houses pending sale were on average much more expensive than those that had sold. We assumed the prices of houses pending sale and those that were already sold would be very close, but we found that prices of active listings and homes pending sale were much closer. At this point, we were unable to conclude as to whether or not status would be helpful as a predictor in our model. 
+
+For a model predicting price only as a function of status, our equation would be:
+
+***
+
+* X1 = 1 if Pending, 0 if otherwise
+* X2 = 1 if Sold, 0 if otherwise
+
+***
+
+$$\hat{Y} = {301.526} + 2.489 (X_1) - 31.861(X_2)$$
+
+***
+Here, the default is active listing. For an active listing, the price is predicted at 301,526. If the house is pending, we add 2,489 to that price. If the house is sold, we subtract 31,861 from that price. 
+
+```{r}
+lm_elem <- lm(price ~ elem, data = Housing1.0)
+summary(lm_elem)
+ggplot(Housing, aes(x=elem, y=price, color=elem)) + 
+  geom_boxplot() +
+  labs(y = "Price (in Thousands of Dollars)", x = "Elementary School District", title = "Price of Home vs. Location by Elementary School District")
+```
+
+***
+After modeling price as a function of elementary school district, we decided it was significant as a predictor. The p-value is 0.001601 and the R-squared is 0.241. Houses near Edison and Harris Elementary are more expensive, they may be in a nicer area. Houses near Adams Elementary have a much lower average price. The other three elementary school districts fall somewhere in the middle, with pretty average prices.
+
+***
+
+* X1 = 1 if Crest, 0 if otherwise
+* X2 = 1 if Edge, 0 if otherwise
+* X3 = 1 if Edison, 0 if otherwise
+* X4 = 1 if Harris, 0 if otherwise
+* X5 = 1 if Parker, 0 if otherwise
+
+***
+
+$$\hat{Y} = {241.83} + 45.98 (X_1) + 27.92(X_2) + 92.05(X_3) + 77.27(X_4) + 15.61(X_5)$$
+
+***
+In this model, the default is Adams. If the elementary school district is Adams, the price is predicted at 241,830. If the school district is Crest, we add 4,598 to this price. If the school district is Edge, we add 2,792 to the original price. If the school district is Edison, we add 9,205 to the original price, and so on. 
+
+```{r}
+#Looking at correlations between variables to see if there is anything we can immediately rule out. 
+pairs(Housing1.0[,2:9])
+cor(Housing1.0[,2:9])
+```
+***
+Here, we are reminded that year built and age standardized contain the exact same information. Age standardized is a function of year built. We know we can exclude year built from our model because age standardized contains the same information, just streamlined, making our model easier to understand. 
+Now, we review correlations to see which variables correlate the most with price. Most of the variables correlatation values are very close. The highest is garage size, followed by bedrooms. All of the variables have at least some correlation, so we are not ruling anything else out at this point. 
+
+###**Initial Model Building**
+
+####**Initial Model Building**
+
+***
+#####**Model 1:**
+```{r}
+mlr1 <- lm(data = Housing1.0, price ~ size + lot + bath + bedrooms + agestandardized + garagesize + elem + status)
+summary(mlr1)
+vif(mlr1)
+```
+***
+Reviewing our summary for our first model, we see that the residual standard error is 45.36, meaning the actual price of a home deviates, on average, 45,360 dollars from the predicted price on the regression line. That number isn't horrible, but this is our first model, so we want to improve it. R-squared is 0.5383, meaning the predictors in our model can account for 53.83% of the variability in price. The p-value is much less than 0.5, so our model is definitely significant. As far as individual predictors, size, lot, elem = edison, and status = sld are all significant. Based on the vif, our model should do a decent job predicting. None of the variables seem to coordinate very much with other variables. This is good news. 
+
+***
+```{r}
+set.seed(1)
+train <- sample(75, 60, replace = FALSE)
+trainingdata <- Housing1.0[train,]
+trainingdata
+#creating training data to make a model with 80% of our data
+training_price_model <- lm(data = trainingdata, price ~ size + lot + bath + bedrooms + agestandardized + garagesize + elem + status, family = binomial(link='logit'))
+
+testdata <- Housing1.0[-train,]
+testdata
+#creating testing data from the other 20%
+predictions <- predict(training_price_model, newdata = testdata)
+#predicting the price of the test data using the model we built
+predictions_df<- data.frame(predictions)
+error <- (abs(predictions_df$predictions - testdata$price)/testdata$price)*100
+#calculating how close we predicted to the actual price of those homes
+error_df <- data.frame(error)
+print(mean(error_df$error))
+```
+***
+We created training and test data for this model to see how well it did at predicting. We used an 80/20 split, with the 80% being the training data. We found that on average, a predicted value for this model was off by 16.5% of the actual value. The most inaccurate prediction was off by over 41%, and the second by 33.7%. For the most part, this model did alright, but we thought we could improve our model to get a smaller prediction error and residual standard error, and a bigger R-squared value. 
+
+***
+```{r}
+plot(mlr1)
+```
+***
+
+This shows a set of diagnostic plots for our first model. In the first plot, Residuals vs. Fitted, we are looking to see if the residuals have nonlinear patterns. Our model had no distinctive pattern present on this plot. The second plot, Normal QQ, tells us whether or not the residuals are normally distributed. If the dots follow a straight line, the distribution is normal. None of the points are especially concerning, they are fairly well fit to the line. On the Scale-Location plot, the residuals here look evenly spread, and the line is pretty horizontal. In the Residuals vs. Leverage plot we see that are the points are pretty well inside the Cook's distance lines, so we conclude that there are no abnormally influential cases. We were unable to diagnose any particular issues, so we decided to try a few different combinations of predictors in order to minimize our residual standard error and improve our R-squared. 
+
+
+###**Model Modification**
+
+####**Model Modification**
+***
+#####**Model 2:**
+```{r}
+mlr2 <- lm(data = Housing1.0, price ~ size + bedrooms + lot + garagesize)
+summary(mlr2)
+vif(mlr2)
+```
+***
+We decided on the predictors for this model by looking at the variables with the greatest correlation values with price. We decided on four because the predictors that came after the first four all had extremely close values for correlation with price. This model was immediately thrown out when compared to Model 1. It has a higher residual standard error, and a lower R-squared. The vifs are good, but not much better than Model 1. 
+
+***
+#####**Model 3:**
+```{r}
+mlr3 <- lm(data = Housing1.0, price ~ size + lot + elem + status)
+summary(mlr3)
+vif(mlr3)
+```
+***
+This model uses all of the significant predictors from Model 1. Model 3 and Model 1 are very comparable. Their values for residual standard error and R-squared are extremely close, but Model 1 is slightly better.  
+
+***
+####**Model 4:**
+```{r}
+mlr4 <- lm(data = Housing1.0, price ~ bedrooms*size + lot + elem + status)
+summary(mlr4)
+vif(mlr4)
+```
+***
+Model 4 is the closest to Model 1. The residual standard error is slightly less. The R-squared is also slightly less, but the adjusted R-squared is slightly higher. We used an interaction between bedroom and size because we thought that logically they would have to depend on each other. More bedrooms = bigger house. 
+
+***
+```{r}
+training_price_model4 <- lm(data = trainingdata, price ~ bedrooms*size + lot + elem + status)
+
+predictions4 <- predict(training_price_model4, newdata = testdata)
+predictions_df4 <- data.frame(predictions4)
+error4 <- (abs(predictions_df4$predictions4 - testdata$price)/testdata$price)*100
+error_df4 <- data.frame(error4)
+print(mean(error_df4$error4))
+```
+***
+
+Based on the R-squared for this model, we thought it had a chance at being a better predictor than Model 1. We used the same training and test data to see how this model did at predicting. The average prediction error for this model was slightly worse, at 16.6%
+
+***
+#####**Model 5**
+```{r}
+mlr5 <- lm(data = Housing1.0, price ~ size*bath + lot + elem + status + bedrooms + garagesize^2)
+summary(mlr5)
+vif(mlr5)
+```
+***
+
+For this model we used an interaction between size and bath. Size and bath had a greater correlation than size and bedrooms. We squared the garage size predictor because we thought that creating a more drastic difference in the values may make it a better predictor. We wanted to accentuate the difference between a home with no garage vs. a home with three. These modifications helped. This model had the highest R-squared value this far, and the lowest residual standard error.  
+
+***
+```{r}
+training_price_model5 <- lm(data = trainingdata, price ~ size*bath + lot + elem + status + bedrooms + garagesize^2)
+
+predictions5 <- predict(training_price_model5, newdata = testdata)
+predictions_df5 <- data.frame(predictions5)
+error5 <- (abs(predictions_df5$predictions5 - testdata$price)/testdata$price)*100
+error_df5 <- data.frame(error5)
+print(mean(error_df5$error5))
+```
+***
+
+We then used our model to predict, using the same training and test data as before. The average prediction error was 15.74%. This model gave the best predictions so far. 
+
+***
+#####**Model 6** 
+```{r}
+mlr6 <- lm(data = Housing1.0, price ~ size + bath + lot + elem  + status + log(bedrooms) + garagesize^2)
+summary(mlr6)
+```
+***
+For this model, we used a log() transformation on bedrooms because we wanted something that minimized number of bedrooms as it got larger. Our thought process was that we wanted to preserve the first few increases, like the difference between a 2 and 3 bedroom home, but minimize the effect as the progressed. We thought that there is a bigger difference between a 2 and 3 bedroom home than there is between a 5 and 6 bedroom home. The more bedrooms a home has, the less effect adding one more has. Originally we kept this model with the interaction between size and bath, but upon experimenting with it, we saw that removing the interaction improved the R-squared and residual standard error. 
+
+***
+```{r}
+training_price_model6 <- lm(data = trainingdata, price ~ size + bath + lot + elem + status + log(bedrooms) + garagesize^2)
+#using same training/test data to see how this model does at predicting
+predictions6 <- predict(training_price_model6, newdata = testdata)
+predictions_df6 <- data.frame(predictions6)
+error6 <- (abs(predictions_df6$predictions6 - testdata$price)/testdata$price)*100
+error_df6 <- data.frame(error6)
+print(mean(error_df6$error6))
+```
+***
+We once again used our new model to predict the same test data. As expected, this model outperformed the others, and gave us a prediction error of 15.56%.
+
+###**Conclusions**
+
+####**Conclusions**
+***
+```{r}
+mlr6 <- lm(data = Housing1.0, price ~ size + bath + lot + elem  + status + log(bedrooms) + garagesize^2)
+summary(mlr6)
+vif(mlr6)
+```
+***
+
+This is our final model. It has a residual standard error of 44.86, the lowest of any of the models we tested. This means that on average, the price of a home deviates from the regression line by $44,860. The R-squared is 0.541, meaning that the predictors in this model account for 54.1 of the variation in home price. All of the VIFs are great. There is only one above 2, and its only 2.04. This means the predictors in this model hardly correlate with one another.
+
+This is the equation for our model:
+
+***
+* X1 = 1 if elem = crest, 0 if otherwise
+* X2 = 1 if elem = edge, 0 if otherwise
+* X3 = 1 if elem = edison, 0 if otherwise
+* X4 = 1 if elem = harris, 0 if otherwise
+* X5 = 1 if elem = parker, 0 if otherwise
+* X6 = 1 if status = pending sale, 0 if otherwise
+* X7 = 1 if status = sold, 0 if otherwise
+
+***
+$$\hat{Y} = {130.864} + 74.591(Size)+6.278(Bath)+10.074(Lot)+3.537(X_1)+6.828(X_2)+84.721(X_3)+53.396(X_4)-11.600(X_5)-19.836(X_6)-37.201(X_7)-49.993(log(Bedrooms))+8.506(Garage Size)$$
+
+***
+```{r}
+plot(mlr6)
+```
+
+***
+In the Residuals vs. Fitted values plot, we see a horizontal line, surrounded by points with no distinctive pattern. This means the residuals do not have nonlinear patterns. On the Normal QQ plot, we see our points generally fit along the line pretty well. None of the points look concerning.  On our Scale-Location plot, we see a horizontal line with randomly spready residuals. The horizontal line shows that the average magnitude of the standardized residuals does not vary much as our model fits more values. The equal spread of the points around this line means constant variance. In the Residuals vs. Leverage plot, we do not see any cases with extremely high influence, as all the points are within the Cook's distance lines. We do however, see that #4 is close. This was also the case in our original model.  
+***
+```{r}
+#95% confidence intervals for the coefficients
+confint(mlr6)
+```
+
+***
+```{r}
+set.seed(1)
+train0 <- sample(75, 74, replace = FALSE)
+trainingdata0 <- Housing1.0[train0,]
+#creating training data that consists of all but 1 house
+training_price_model0 <- lm(data = trainingdata, price ~ size + bath + lot + elem  + status + log(bedrooms) + garagesize^2)
+
+testdata0 <- Housing1.0[-train0,]
+#creating test data that is just the 1 house excluded from the training data
+predictions0 <- predict(training_price_model0, newdata = testdata0)
+predictions_df0<- data.frame(predictions0)
+error0 <- (abs(predictions_df0$predictions0 - testdata0$price)/testdata0$price)*100
+error_df0 <- data.frame(error0)
+print(mean(error_df0$error0))
+#calculating the difference between predicted vs. actual, then dividing by the actual value to get an prediction error percentage
+```
+Here we used all but one home from our data to create a model, then used the model to predict the one datapoint excluded from building the model. Our model did well at predicting the price of this home. The actual price of the home was 259,900, our model predicted a value of 253,652 dollars. The prediction error was just 2.4%.
+
+***
+```{r}
+hypothetical_home <- data.frame("size" = 1.800, "lot" = 3, "bath" = 2, "bedrooms" = 3, "elem" = "edison", "status" = "sld", "garagesize" = 1)
+#creating hypothetical values for a house
+#doing a 95% prediction interval for said house
+predict(mlr6, newdata  = hypothetical_home, interval = "predict")
+#doing a 95% confidence interval for said house
+predict(mlr6, newdata  = hypothetical_home, interval = "confidence")
+```
+The 95% prediction interval says that we are 95% certain that the price of the hypothetical home would be between 214,149 and 403,867 dollars. The confidence interval says that it is 95% certain that the mean of prediction values is between 278,093 and 339,924 dollars. 
