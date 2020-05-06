@@ -1,0 +1,208 @@
+---
+title: "Project Part 2"
+author: "Bailey Young, Sage Young, Matt Ramundo"
+date: '`r format(Sys.time(), "%A, %B %d, %Y @ %I:%M %p")`'
+output: 
+  html_document: 
+    theme: yeti
+    highlight: textmate
+---
+
+## {.tabset}
+
+```{r, include = FALSE}
+library(readxl)
+library(leaps)
+library(glmnet)
+library(pls)
+```
+
+###**Part A**
+
+**Consider the model that you arrived at in the previous project as the first candidate model.**
+
+***
+
+```{r}
+Housing <- read_excel("Housing.xlsx")
+model_1 <- lm(data = Housing, price ~ size + bath + lot + elem  + status + log(bedrooms) + garagesize^2)
+summary(model_1)
+```
+
+###**Part B**
+
+**Create a second candidate model by using regsubsets over the entire data set.  You can decide whether you prefer overall selection, forward selection, or backward selection, and you can decide which statistic you will use to determine the best model from the regsubsets process.  Just conduct a justifiable model selection process and report the predictors in your final model.**
+
+***
+```{r}
+attach(Housing)
+
+regfit.fwd <- regsubsets(price ~ ., data = Housing, nvmax = 9, method = "forward")
+
+fwd.summary <- summary(regfit.fwd)
+names(summary(regfit.fwd))
+
+fwd.summary$bic
+fwd.summary$which
+```
+
+The model with the lowest bic was our 6 predictor model, it consisted of the following predictors: size, lot, garagesize, statussld, elemedison, elemharris.
+
+```{r}
+regfit.bwd <- regsubsets(price ~ ., data = Housing, nvmax = 9, method = "backward")
+
+bwd.summary <- summary(regfit.bwd)
+bwd.summary$bic
+bwd.summary$which
+```
+
+Using backward selection, the model with the lowest bic is our 6 predictor model. It contains the follow predictors: size, lot, bedrooms, statussld, elemharris, and elemedison.
+
+```{r}
+regfit.all <- regsubsets(price ~ ., data= Housing, nvmax=9, really.big = TRUE)
+
+all.summary <- summary(regfit.all)
+all.summary$bic
+all.summary$which
+```
+
+Using overall selection, our model with the lowest bic is once again our six predictor model. It contains the following predictors: size, lot, bedrooms, statussld, elemedison, and elemharris. 
+
+Looking over our results, we see that the best model using overall selection and backwards selection are the exact same. We also see that our best model found using forward selection is only different by one predictor.
+
+```{r}
+model_2 <- glm(price ~ size + lot + bedrooms + status + elem, data = Housing)
+summary(model_2)
+```
+
+###**Part C**
+
+**Create a training/test split of the data by which roughly half of the 76 observations are training data and half are test data.**
+
+***
+
+```{r}
+set.seed(1)
+trainingindex <- sample(1:nrow(Housing), nrow(Housing)*0.50)
+train <- Housing[trainingindex, ]
+test <- Housing[-trainingindex, ]
+```
+
+###**Part D**
+
+**Now use regsubsets over only the training data to determine the number of predictors that should be in your final model. Then use regsubsets over the entire data set with the determined number of variables to determine your third candidate model.**
+
+***
+
+```{r}
+regfit.best <- regsubsets(price ~ ., data = train, nvmax = 9, really.big = TRUE)
+
+test.mat <- model.matrix(price ~ size + lot + bath + bedrooms + yearbuilt + agestandardized + garagesize + status + elem,data=test)
+
+val.errors <- rep(NA,9)
+
+for(i in 1:9){
+  coefi=coef(regfit.best,id=i)
+  pred=test.mat[,names(coefi)]%*%coefi
+  val.errors[i] <- mean((test$price-pred)^2)
+}
+
+val.errors
+```
+
+```{r}
+which.min(val.errors)
+```
+
+```{r}
+coef(regfit.best,which.min(val.errors))
+```
+
+```{r}
+model_3 <- glm(price ~ size + lot + bedrooms + status + elem, data = Housing)
+summary(model_3)
+```
+Here, we arrive at the same model as Part B.
+
+###**Part E**
+
+**Next, use either Ridge Regression or Lasso Regression with the training data, and use cross validation via the cv.glmnet function to determine the best λ value.  The model from this step with the best λ value will be your fourth candidate model.**
+
+***
+
+```{r}
+train.matrix <- model.matrix(price ~ ., data = train)[,-1]
+test.matrix <- model.matrix(price ~ ., data = test)[,-1]
+
+grid = 10^seq(10,-2, length=100)
+
+ridge.mod <- glmnet(train.matrix, train$price, alpha=0, lambda =grid)
+ridge.fit <- cv.glmnet(train.matrix, train$price, alpha=0, lambda =grid)
+```
+
+```{r}
+ridge.lambda <- ridge.fit$lambda.min
+ridge.lambda
+
+ridge.pred <- predict(ridge.mod, s=ridge.lambda, newx=test.matrix)
+```
+
+```{r}
+model_4 <- glmnet(train.matrix, train$price, alpha=0, lambda = 18.73817)
+```
+
+###**Part F**
+
+**Finally, use either  principal components regression or partial least squares regression for the training data.  Use cross validation (see the class notes or the Chapter 6 Lab from the text) to help you determine the number of components in the model and briefly explain your choice.  This model will be your 5th candidate model.**
+
+***
+
+```{r}
+pls.fit <- plsr(price ~ ., data = train, scale = TRUE, validation = "CV")
+summary(pls.fit)
+
+validationplot(pls.fit, val.type = "MSEP")
+
+
+#M=2 components because at 2 components, the MSEP is the lowest.
+
+pls.2m <- plsr(price~ ., data = Housing, scale = TRUE, ncomp=2)
+summary(pls.2m)
+```
+
+###**Part G**
+
+**For each of the five candidate models, calculate the mean square error for predicting the outcomes in the test data set that you created in Part C.** 
+
+***
+
+```{r}
+model_1 <- lm(data = train, price ~ size + bath + lot + elem  + status + log(bedrooms) + garagesize^2)
+predict_1 <- predict(model_1, test)
+mean((predict_1 - test$price)^2)
+```
+
+```{r}
+#Note our results for parts B and D were the same therefore models 2 and 3 are the same model
+model_3 <- glm(price ~ size + lot + bedrooms + status + elem, data = Housing)
+predict_3 <- predict(model_3, test)
+mean((predict_3 - test$price)^2)
+```
+
+```{r}
+model_4 <- glmnet(train.matrix, train$price, alpha=0, lambda = 18.73817)
+
+mean((ridge.pred - test$price)^2)
+
+```
+
+```{r}
+model_5 <- plsr(price~ ., data = Housing, scale = TRUE, ncomp=2)
+predict_5 <- predict(model_5, test)
+mean((predict_5 - test$price)^2)
+```
+**Based on this comparison, which model do you prefer for this situation?**
+
+***
+
+The model with the lowest MSE was model 5, the partial least squares regression model. The MSE was 2144.55. A close second was model 3/model 2, obtained by using regsubsets on both the entire data set, and then obtained again when used on just the training data. The MSE for this model is 2197.164. Model 4, which we obtained through ridge regression had a MSE of 2560.697. Lastly, we had our original model, with a MSE of 2903.412. Our original model performed the worst, and the plsr model performed the best. Overall, all of the models did well, and there was not very much difference in MSE between them. 
